@@ -1,0 +1,54 @@
+# ====================================
+#            build-system
+# ====================================
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+# ====================================
+#              project
+# ====================================
+
+[project]
+name = "rsw_ai"
+version = "0.1.0"
+readme = "README.md"
+
+dependencies = [
+    "numpy>=2.0",
+    "opencv-python>=4.10",
+    "torch",
+    "torchvision",
+    "torchaudio",
+    "matplotlib",
+    "pillow",
+    "pyyaml",
+    "requests",
+    "kaggle",
+]
+
+[project.optional-dependencies]
+dev = [
+    "build",
+    "pytest",
+    "ruff",
+    "ipykernel",
+    "jupyter",
+]
+
+# ====================================
+#                tool
+# ====================================
+
+[tool.ruff]
+line-length = 88
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
