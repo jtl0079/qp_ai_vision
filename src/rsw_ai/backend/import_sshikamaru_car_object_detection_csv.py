@@ -44,6 +44,6 @@ def import_sshikamaru_car_object_detection_csv(
                 height / image_height,
             ]
 
-            dataset.dataset.setdefault(filename, []).append(object_data)
+            dataset.dataset_txts.setdefault(filename, []).append(object_data)
 
     return dataset

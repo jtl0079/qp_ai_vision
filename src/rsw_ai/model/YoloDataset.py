@@ -1,10 +1,15 @@
-class YoloDataset:
-    def __init__(self) -> None:
-        self.dataset: dict[str, list[list[float]]] = {}
-        """
-        Dataset structure
+from dataclasses import dataclass, field
 
-        dataset
+from rsw_ai.model.YoloDatasetYaml import YoloDatasetYaml
+
+
+@dataclass
+class YoloDataset:
+    dataset_txts: dict[str, list[list[float]]] = field(default_factory=dict)
+    """
+        Dataset_txt structure
+
+        dataset_txt
         └── filename (str)
             └── objects (list)
                 └── object_data (list[float])
@@ -25,4 +30,6 @@ class YoloDataset:
                 [2, 0.44, 0.31, 0.18, 0.27],
             ],
         }
-        """
+    """
+
+    dataset_yml: YoloDatasetYaml = field(default_factory=YoloDatasetYaml)

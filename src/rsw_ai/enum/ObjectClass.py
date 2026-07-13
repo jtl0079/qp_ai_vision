@@ -13,6 +13,10 @@ class ObjectClass(Enum):
         return self.name.lower()
 
     @classmethod
+    def all_labels(cls) -> list[str]:
+        return [obj.label for obj in sorted(cls, key=lambda obj: obj.id)]
+
+    @classmethod
     def from_id(cls, class_id: int):
         for item in cls:
             if item.id == class_id:
