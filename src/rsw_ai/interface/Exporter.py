@@ -19,4 +19,4 @@ class Exporter(ABC, Generic[T]):
         str
             Exported dataset path.
         """
-        pass
+        raise NotImplementedError

@@ -1,9 +1,8 @@
-from enum import Enum
-
+from rsw_ai.base.BaseEnum import BaseEnum
 from .Platform import Platform
 
 
-class Dataset(Enum):
+class DatasetRepositoryLayout(BaseEnum):
     # id, name, platform
     SSHIKAMARU_CAR_OBJECT_DETECTION = (
         0,
@@ -14,10 +13,6 @@ class Dataset(Enum):
     @property
     def id(self) -> int:
         return self.value[0]
-
-    @property
-    def label(self) -> str:
-        return self.name.lower()
 
     @property
     def dataset_name(self) -> str:

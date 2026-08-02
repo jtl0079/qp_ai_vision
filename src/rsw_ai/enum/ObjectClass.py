@@ -1,20 +1,12 @@
-from enum import Enum
+from rsw_ai.base.BaseEnum import BaseEnum
 
 
-class ObjectClass(Enum):
+class ObjectClass(BaseEnum):
     CAR = (0,)
 
     @property
     def id(self) -> int:
         return self.value[0]
-
-    @property
-    def label(self) -> str:
-        return self.name.lower()
-
-    @classmethod
-    def all_labels(cls) -> list[str]:
-        return [obj.label for obj in sorted(cls, key=lambda obj: obj.id)]
 
     @classmethod
     def from_id(cls, class_id: int):
@@ -23,9 +15,3 @@ class ObjectClass(Enum):
                 return item
         raise ValueError(f"Unknown class id: {class_id}")
 
-    @classmethod
-    def from_label(cls, label: str):
-        for item in cls:
-            if item.label == label:
-                return item
-        raise ValueError(f"Unknown label: {label}")
