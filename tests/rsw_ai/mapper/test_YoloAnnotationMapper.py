@@ -18,6 +18,7 @@ def test_from_detection_object():
 
     annotation = YoloAnnotationMapper.from_DetectionObject(
         detection=detection,
+        class_id=3,
         image_width=1000,
         image_height=500,
     )

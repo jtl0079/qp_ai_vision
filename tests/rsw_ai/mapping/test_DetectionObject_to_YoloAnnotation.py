@@ -11,7 +11,7 @@ from rsw_ai.model.YoloAnnotation import YoloAnnotation
 def test_convert_detection_object_to_yolo_annotation():
 
     detection = DetectionObject(
-        class_id=3,
+        class_id=999,  # 不会使用到，可以随便填
         bbox=BoundingBox(
             x_min=100,
             y_min=50,
@@ -22,6 +22,7 @@ def test_convert_detection_object_to_yolo_annotation():
 
     annotation = DetectionObject_to_YoloAnnotation(
         detection=detection,
+        class_id=3,
         image_width=1000,
         image_height=500,
     )
@@ -47,6 +48,7 @@ def test_raise_when_image_width_is_zero():
     with pytest.raises(ValueError, match="image_width must be greater than 0."):
         DetectionObject_to_YoloAnnotation(
             detection=detection,
+            class_id=0,
             image_width=0,
             image_height=100,
         )
@@ -62,6 +64,7 @@ def test_raise_when_image_height_is_zero():
     with pytest.raises(ValueError, match="image_height must be greater than 0."):
         DetectionObject_to_YoloAnnotation(
             detection=detection,
+            class_id=0,
             image_width=100,
             image_height=0,
         )

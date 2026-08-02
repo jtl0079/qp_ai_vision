@@ -4,6 +4,7 @@ from rsw_ai.model.YoloAnnotation import YoloAnnotation
 
 def DetectionObject_to_YoloAnnotation(
     detection: DetectionObject,
+    class_id: int,
     image_width: int,
     image_height: int,
 ) -> YoloAnnotation:
@@ -17,7 +18,7 @@ def DetectionObject_to_YoloAnnotation(
     bbox = detection.bbox
 
     return YoloAnnotation(
-        class_id=detection.class_id,
+        class_id=class_id,
         center_x=bbox.center_x / image_width,
         center_y=bbox.center_y / image_height,
         width=bbox.width / image_width,

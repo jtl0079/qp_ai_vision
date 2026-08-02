@@ -6,6 +6,13 @@ VisionDetectionDataset
 │
 ├── name : str
 │
+├── class_map : ClassMap
+│   │
+│   ├── 0 -> "car"
+│   ├── 1 -> "person"
+│   ├── 2 -> "bicycle"
+│   └── ...
+│
 └── splits : list<DatasetSplit>
     │
     ├── DatasetSplit ("train")
@@ -50,6 +57,7 @@ VisionDetectionDataset
     │
     └── DatasetSplit ("test")
         └── samples : list<Sample>
+
 """
 
 

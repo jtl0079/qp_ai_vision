@@ -4,6 +4,7 @@ import csv
 from rsw_ai.enum.DatasetRepositoryLayout import DatasetRepositoryLayout
 from rsw_ai.enum.ObjectClass import ObjectClass
 from rsw_ai.model.BoundingBox import BoundingBox
+from rsw_ai.model.ClassMap import ClassMap
 from rsw_ai.model.DatasetSplit import DatasetSplit
 from rsw_ai.model.DetectionObject import DetectionObject
 from rsw_ai.model.Sample import Sample
@@ -44,6 +45,11 @@ def import_sshikamaru_car_object_detection_dataset(
 
     dataset = VisionDetectionDataset(
         name=DatasetRepositoryLayout.SSHIKAMARU_CAR_OBJECT_DETECTION.label,
+        class_map=ClassMap(
+            names=[
+                ObjectClass.CAR.label,
+            ],
+        ),
     )
 
     train_split = DatasetSplit[str, list[DetectionObject]](
@@ -53,6 +59,10 @@ def import_sshikamaru_car_object_detection_dataset(
     dataset.splits.append(train_split)
 
     samples: dict[str, Sample[str, list[DetectionObject]]] = {}
+
+    # ====================================
+    # Import CSV
+    # ====================================
 
     with train_csv.open(newline="", encoding="utf-8") as file:
         reader = csv.DictReader(file)
@@ -73,7 +83,9 @@ def import_sshikamaru_car_object_detection_dataset(
 
             sample.target.append(
                 DetectionObject(
-                    class_id=int(ObjectClass.CAR.id),
+                    class_id=dataset.class_map.get_id(
+                        ObjectClass.CAR.label,
+                    ),
                     bbox=BoundingBox(
                         x_min=float(row["xmin"]),
                         y_min=float(row["ymin"]),

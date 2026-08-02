@@ -4,6 +4,7 @@ from rsw_ai.mapping.VisionDetectionDataset_to_VisionYoloDataset import (
     VisionDetectionDataset_to_VisionYoloDataset,
 )
 from rsw_ai.model.BoundingBox import BoundingBox
+from rsw_ai.model.ClassMap import ClassMap
 from rsw_ai.model.DatasetSplit import DatasetSplit
 from rsw_ai.model.DetectionObject import DetectionObject
 from rsw_ai.model.Sample import Sample
@@ -15,6 +16,13 @@ def test_VisionDetectionDataset_to_VisionYoloDataset():
 
     dataset = VisionDetectionDataset(
         name="test_dataset",
+        class_map=ClassMap(
+            names=[
+                "car",
+                "person",
+                "cat",
+            ],
+        ),
         splits=[
             DatasetSplit(
                 name="train",
@@ -44,7 +52,7 @@ def test_VisionDetectionDataset_to_VisionYoloDataset():
                                     x_max=600,
                                     y_max=300,
                                 ),
-                                ),
+                            ),
                             DetectionObject(
                                 class_id=2,
                                 bbox=BoundingBox(
@@ -88,6 +96,9 @@ def test_VisionDetectionDataset_to_VisionYoloDataset():
 
     # Dataset name
     assert result.name == "test_dataset"
+
+    # Class map
+    assert result.class_map == dataset.class_map
 
     # Number of splits
     assert len(result.splits) == 2
@@ -204,6 +215,9 @@ def test_raise_when_sample_target_is_none():
 
     dataset = VisionDetectionDataset(
         name="test_dataset",
+        class_map=ClassMap(
+            names=["car"],
+        ),
         splits=[
             DatasetSplit(
                 name="train",

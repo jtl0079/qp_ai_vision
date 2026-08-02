@@ -1,10 +1,12 @@
+from copy import deepcopy
+
 from rsw_ai.mapping.DetectionObject_to_YoloAnnotation import (
     DetectionObject_to_YoloAnnotation,
 )
 from rsw_ai.model.DatasetSplit import DatasetSplit
+from rsw_ai.model.Sample import Sample
 from rsw_ai.model.VisionDetectionDataset import VisionDetectionDataset
 from rsw_ai.model.VisionYoloDataset import VisionYoloDataset
-from rsw_ai.model.Sample import Sample
 
 
 def VisionDetectionDataset_to_VisionYoloDataset(
@@ -21,6 +23,7 @@ def VisionDetectionDataset_to_VisionYoloDataset(
 
     yolo_dataset = VisionYoloDataset(
         name=dataset.name,
+        class_map=deepcopy(dataset.class_map),
         splits=[],
     )
 
@@ -33,14 +36,23 @@ def VisionDetectionDataset_to_VisionYoloDataset(
             if sample.target is None:
                 raise ValueError("sample.target must not be None.")
 
-            annotations = [
-                DetectionObject_to_YoloAnnotation(
-                    detection=detection,
-                    image_width=image_width,
-                    image_height=image_height,
+            annotations = []
+
+            for detection in sample.target:
+
+                yolo_class_id = dataset.class_map.convert_id(
+                    class_id=detection.class_id,
+                    target=yolo_dataset.class_map,
                 )
-                for detection in sample.target
-            ]
+
+                annotations.append(
+                    DetectionObject_to_YoloAnnotation(
+                        detection=detection,
+                        class_id=yolo_class_id,
+                        image_width=image_width,
+                        image_height=image_height,
+                    )
+                )
 
             yolo_samples.append(
                 Sample(

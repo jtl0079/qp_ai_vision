@@ -15,3 +15,9 @@ class ObjectClass(BaseEnum):
                 return item
         raise ValueError(f"Unknown class id: {class_id}")
 
+    @classmethod
+    def labels_sorted_by_id(cls) -> list[str]:
+        return [
+            item.label
+            for item in sorted(cls, key=lambda item: item.id)
+        ]
