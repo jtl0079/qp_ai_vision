@@ -6,3 +6,4 @@ from rsw_ai.model.BoundingBox import BoundingBox
 class DetectionObject:
     class_id: int 
     bbox: BoundingBox 
+

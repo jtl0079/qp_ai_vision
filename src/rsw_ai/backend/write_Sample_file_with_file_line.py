@@ -1,10 +1,14 @@
 from pathlib import Path
+from typing import Any, TypeVar
 
 from rsw_ai.model.Sample import Sample
+from rsw_ai.interface.SupportsFileLine import SupportsFileLine
+
+TTarget = TypeVar("TTarget", bound=SupportsFileLine)
 
 
-def write_Sample_file_with_file_line(
-    sample: Sample,
+def write_sample_file_with_file_line(
+    sample: Sample[Any, TTarget],
     file_path: str | Path,
 ) -> None:
     # ====================================

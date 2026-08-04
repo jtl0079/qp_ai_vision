@@ -3,6 +3,11 @@ from rsw_ai.base.BaseEnum import BaseEnum
 
 class ObjectClass(BaseEnum):
     CAR = (0,)
+    THREEWHEEL = (1,)
+    BUS = (2,)
+    TRUCK = (3,)
+    MOTORBIKE = (4,)
+    VAN = (5,)
 
     @property
     def id(self) -> int:
@@ -17,7 +22,4 @@ class ObjectClass(BaseEnum):
 
     @classmethod
     def labels_sorted_by_id(cls) -> list[str]:
-        return [
-            item.label
-            for item in sorted(cls, key=lambda item: item.id)
-        ]
+        return [item.label for item in sorted(cls, key=lambda item: item.id)]

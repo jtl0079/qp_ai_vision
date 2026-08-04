@@ -5,26 +5,29 @@ Project/
 ├───docs                        
 │   └───eng_raw                        
 ├───notebooks                   # .jpynb
-├───outputs                     # Non-native objects, such as downloaded data and media files.
-│   ├───images
-│   ├───kaggle                  # Resources from Kagle
-│   │   └───downloaded          # Downloaded dataset
-│   │       └───sshikamaru_car_object_detection     # dataset name
-│   ├───metadata
-│   └───temp
-│       └───labels
+├───outputs                     # Generated, downloaded, and temporary artifacts.
+│   ├───datasets                # Dataset resources.
+│   │   ├───downloads           # Original datasets downloaded from external sources.
+│   │   │   ├───kaggle
+│   │   │   │   └───sshikamaru_car_object_detection
+│   │   │   ├───roboflow
+│   │   │   └───manual
+│   │   │
+│   │   ├───yolo                # Generated YOLO datasets.
+│   │   ├───coco                # Generated COCO datasets.
+│   │   └───voc                 # Generated Pascal VOC datasets.
+│   │
+│   ├───experiments/
+│   ├───logs                    # Runtime logs.
+│   └───temp                    # Temporary files that can be safely removed.
+|
 ├───src
 │   ├───rsw_ai
 │   │   ├───api
-│   │   │   └───__pycache__
 │   │   ├───backend
-│   │   │   └───__pycache__
 │   │   ├───enum
-│   │   │   └───__pycache__
 │   │   ├───interface
-│   │   │   └───__pycache__
 │   │   ├───model
-│   │   │   └───__pycache__
 │   │   ├───pipeline
 │   │   │   └───__pycache__
 │   │   └───__pycache__
