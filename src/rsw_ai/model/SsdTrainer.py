@@ -102,7 +102,7 @@ class SsdTrainer:
             print(
                 f"Epoch Loss: {loss.item():.4f}"
             )
-        self.save_model(model, "/content/drive/MyDrive/RSW_Y2S1_AI/ssd_model.pth")
+        self.save_model(model, "/你们要save的path/ssd_model.pth")
 
     def save_model(self, model, path):
       torch.save(model.state_dict(), path)

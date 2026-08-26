@@ -24,12 +24,12 @@ print("Using device:", device)
 # ============================================================
 
 class_names = [
-    "Car",
-    "Threewheel",
-    "Bus",
-    "Truck",
-    "Motorbike",
-    "Van"
+    "CAR",
+    "THREEWHEEL",
+    "BUS",
+    "TRUCK",
+    "MOTORBIKE",
+    "VAN"
 ]
 
 
@@ -38,12 +38,12 @@ class_names = [
 # ============================================================
 
 ssd_model = torchvision.models.detection.ssd300_vgg16(
-    num_classes=2
+    num_classes=7
 )
 
 ssd_model.load_state_dict(
     torch.load(
-        "/content/drive/MyDrive/RSW_Y2S1_AI/ssd_model.pth",
+        "/你们save的ssdmodel path，SsdTrainer.py 里面写的一样跟/ssd_model.pth",
         map_location=device,
         weights_only=True
     )

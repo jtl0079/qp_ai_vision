@@ -12,7 +12,7 @@ from rsw_ai.model.SsdTrainer import SsdTrainer
 from rsw_ai.backend.ssdTransform import SsdTransform
 
 
-data =import_sshikamaru_car_object_detection_dataset("/content/drive/MyDrive/RSW_Y2S1_AI/dataset/data")
+data =import_sshikamaru_car_object_detection_dataset("dataSet 的 path")
 converter = VisionToSsdConverter()
 
 
