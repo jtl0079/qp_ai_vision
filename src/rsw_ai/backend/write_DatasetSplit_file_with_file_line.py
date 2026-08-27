@@ -11,8 +11,8 @@ def write_DatasetSplit_file_with_file_line(
     # ====================================
     # Include dependency
     # ====================================
-    from rsw_ai.backend.write_Sample_file_with_file_line import (
-        write_Sample_file_with_file_line,
+    from rsw_ai.backend.write_sample_file_with_file_line import (
+        write_sample_file_with_file_line,
     )
 
     # ====================================
