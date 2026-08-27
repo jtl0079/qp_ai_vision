@@ -1,3 +1,5 @@
+'''
+
 import sys
 sys.path.append("/content/drive/MyDrive/RSW_Y2S1_AI/qp_ai_vision-main/src")
 
@@ -78,3 +80,4 @@ trainer.train(
     optimizer=optimizer,
     epochs=10,
 )
+'''
