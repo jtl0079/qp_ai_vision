@@ -5,10 +5,21 @@ import torch
 ##extend Dataset class from torch to let the class can traning
 class SsdTorchDataset(Dataset):
 
-    def __init__(self, ssd_dataset,transform=None,):
+    def __init__(self, ssd_dataset,transform=None,split="train"):
         self.ssd_dataset = ssd_dataset
-        self.image_paths = list(ssd_dataset.annotations.keys())
         self.transform = transform
+
+        self.image_paths = []
+
+        for image_path, annotation in ssd_dataset.annotations.items():
+
+            if split == "train":
+                if "/train/" in image_path.replace("\\", "/"):
+                    self.image_paths.append(image_path)
+
+            elif split == "valid":
+                if "/valid/" in image_path.replace("\\", "/"):
+                    self.image_paths.append(image_path)
 
     def __len__(self):
         return len(self.image_paths)

@@ -1,5 +1,3 @@
-'''
-
 import sys
 sys.path.append("/content/drive/MyDrive/RSW_Y2S1_AI/qp_ai_vision-main/src")
 
@@ -18,7 +16,7 @@ from rsw_ai.mapping.VisionYoloDataset_to_VisionDetectionDataset import (
 
 yolo_data = (
     import_nadinpethiyagoda_vehicle_dataset_for_yolo_to_VisionYoloDataset(
-        "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/vehicle dataset/train"
+        "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/vehicle dataset"
     )
 )
 
@@ -80,4 +78,3 @@ trainer.train(
     optimizer=optimizer,
     epochs=10,
 )
-'''
