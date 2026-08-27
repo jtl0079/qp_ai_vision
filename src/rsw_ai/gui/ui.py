@@ -43,7 +43,7 @@ ssd_model = torchvision.models.detection.ssd300_vgg16(
 
 ssd_model.load_state_dict(
     torch.load(
-        "/你们save的ssdmodel path，SsdTrainer.py 里面写的一样跟/ssd_model.pth",
+        "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/ssd_model.pth",
         map_location=device,
         weights_only=True
     )

@@ -3,21 +3,43 @@ sys.path.append("/content/drive/MyDrive/RSW_Y2S1_AI/qp_ai_vision-main/src")
 
 from rsw_ai.model.SsdDataset import SsdDataset
 from rsw_ai.model.Dataset import Dataset
-from rsw_ai.backend.import_sshikamaru_car_object_detection_dataset import import_sshikamaru_car_object_detection_dataset
+from rsw_ai.backend.import_nadinpethiyagoda_vehicle_dataset_for_yolo_to_VisionYoloDataset import import_nadinpethiyagoda_vehicle_dataset_for_yolo_to_VisionYoloDataset
 
 from rsw_ai.backend.VisionToSsdConverter import VisionToSsdConverter
 from rsw_ai.model.SsdTorchDataset import SsdTorchDataset
 import torchvision
 from rsw_ai.model.SsdTrainer import SsdTrainer
 from rsw_ai.backend.ssdTransform import SsdTransform
+from rsw_ai.mapping.VisionYoloDataset_to_VisionDetectionDataset import (
+    VisionYoloDataset_to_VisionDetectionDataset
+)
+
+yolo_data = (
+    import_nadinpethiyagoda_vehicle_dataset_for_yolo_to_VisionYoloDataset(
+        "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/vehicle dataset/train"
+    )
+)
 
 
-data =import_sshikamaru_car_object_detection_dataset("dataSet 的 path")
+# ============================================================
+# 2. YOLO Dataset -> Detection Dataset
+# ============================================================
+
+detection_data = (
+    VisionYoloDataset_to_VisionDetectionDataset(
+        yolo_data
+    )
+)
+
+
+# ============================================================
+# 3. Detection Dataset -> SSD Dataset
+# ============================================================
+
 converter = VisionToSsdConverter()
 
-
 ssd_data = converter.convert(
-    data
+    detection_data
 )
 
 transfrom = SsdTransform(
