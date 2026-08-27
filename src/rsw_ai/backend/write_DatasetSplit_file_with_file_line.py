@@ -29,7 +29,7 @@ def write_DatasetSplit_file_with_file_line(
         sample_name = Path(sample.input).stem
         file_path = output_dir / f"{sample_name}{file_extension}"
 
-        write_Sample_file_with_file_line(
+        write_sample_file_with_file_line(
             sample,
             file_path,
         )
