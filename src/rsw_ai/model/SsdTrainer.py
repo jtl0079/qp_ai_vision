@@ -132,7 +132,7 @@ class SsdTrainer:
 
         self.save_model(
             model,
-            "/content/drive/MyDrive/RSW_Y2S1_AI/ssd_model.pth"
+            "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/ssd_model.pth"
         )
 
         print(

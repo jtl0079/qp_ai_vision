@@ -1,7 +1,7 @@
 import sys
 sys.path.insert(0, "/content/qp_ai_vision/src")
 import torch
-
+import pickle
 from rsw_ai.model.SsdDataset import SsdDataset
 from rsw_ai.model.Dataset import Dataset
 from rsw_ai.backend.import_nadinpethiyagoda_vehicle_dataset_for_yolo_to_VisionYoloDataset import import_nadinpethiyagoda_vehicle_dataset_for_yolo_to_VisionYoloDataset
@@ -45,10 +45,16 @@ def main():
     detection_data
   )
 
+  with open(
+    "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/ssd_data.pkl",
+    "wb"
+  ) as f:
+    pickle.dump(ssd_data, f)
   transfrom = SsdTransform(
     resize=(300, 300),
     horizontal_flip=False,
     vertical_flip=False,
+    denoise = "gaussian",
     brightness=1.0,
     contrast=1.0,
     normalize=True
