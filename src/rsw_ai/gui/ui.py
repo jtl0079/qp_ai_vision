@@ -4,9 +4,11 @@ import torchvision
 import numpy as np
 import gradio as gr
 import pickle
+import sys
 
-import rsw_ai.backend.ssdTransform as SsdTransform
-import rsw_ai.model.SsdTorchDataset as SsdTorchDataset
+sys.path.insert(0, "/content/qp_ai_vision/src")
+from rsw_ai.backend.ssdTransform import SsdTransform
+from rsw_ai.model.SsdTorchDataset import SsdTorchDataset
 
 from rsw_ai.model.ObjectDetectionEvaluator import (
     ObjectDetectionEvaluator
@@ -198,29 +200,29 @@ def predict_ssd(
             []
         )
 
-
     # --------------------------------------------------------
-    # Convert image to RGB
+    # Keep ORIGINAL user image
     # --------------------------------------------------------
 
-    image_rgb = cv2.cvtColor(
-        image,
-        cv2.COLOR_BGR2RGB
+    original_image = image.copy()
+
+    original_height, original_width = (
+        original_image.shape[:2]
     )
 
-
     # --------------------------------------------------------
-    # Resize
+    # Resize image for SSD
+    # SSD300 requires 300 x 300 input
     # --------------------------------------------------------
 
     transformed = cv2.resize(
-        image_rgb,
+        original_image,
         (300, 300)
     )
 
-
     # --------------------------------------------------------
     # Gaussian denoise
+    # Same preprocessing as validation
     # --------------------------------------------------------
 
     transformed = cv2.GaussianBlur(
@@ -228,7 +230,6 @@ def predict_ssd(
         (5, 5),
         0
     )
-
 
     # --------------------------------------------------------
     # Contrast = 1.5
@@ -239,7 +240,6 @@ def predict_ssd(
         axis=(0, 1),
         keepdims=True
     )
-
 
     transformed = np.clip(
         (
@@ -256,9 +256,9 @@ def predict_ssd(
         np.uint8
     )
 
-
     # --------------------------------------------------------
-    # Convert to tensor
+    # Convert to Tensor
+    # 0-255 -> 0-1
     # --------------------------------------------------------
 
     tensor_image = (
@@ -270,14 +270,12 @@ def predict_ssd(
         / 255.0
     )
 
-
     tensor_image = tensor_image.to(
         device
     )
 
-
     # --------------------------------------------------------
-    # Prediction
+    # SSD Prediction
     # --------------------------------------------------------
 
     prediction = ssd_prediction_function(
@@ -286,35 +284,47 @@ def predict_ssd(
         device
     )
 
-
     boxes = prediction["boxes"]
     labels = prediction["labels"]
     scores = prediction["scores"]
-
 
     # --------------------------------------------------------
     # Confidence filtering
     # --------------------------------------------------------
 
     keep = (
-        scores
-        >= confidence_threshold
+        scores >= confidence_threshold
     )
-
 
     boxes = boxes[keep]
     labels = labels[keep]
     scores = scores[keep]
 
+    # --------------------------------------------------------
+    # Draw on ORIGINAL user image
+    # --------------------------------------------------------
+
+    result_image = original_image.copy()
+
+    detected_objects = []
+
+    # --------------------------------------------------------
+    # Scale bounding boxes
+    # from 300 x 300
+    # back to ORIGINAL image size
+    # --------------------------------------------------------
+
+    scale_x = (
+        original_width / 300.0
+    )
+
+    scale_y = (
+        original_height / 300.0
+    )
 
     # --------------------------------------------------------
     # Draw predictions
     # --------------------------------------------------------
-
-    result_image = transformed.copy()
-
-    detected_objects = []
-
 
     for box, label, score in zip(
         boxes,
@@ -323,15 +333,29 @@ def predict_ssd(
     ):
 
         x1, y1, x2, y2 = (
-            box.int().tolist()
+            box.tolist()
         )
 
+        # Scale back to original image
+        x1 = int(x1 * scale_x)
+        y1 = int(y1 * scale_y)
+        x2 = int(x2 * scale_x)
+        y2 = int(y2 * scale_y)
+
+        # ----------------------------------------------------
+        # SSD label:
+        # 0 = background
+        # 1 = CAR
+        # 2 = THREEWHEEL
+        # ...
+        # 6 = VAN
+        #
+        # Convert to class_names index
+        # ----------------------------------------------------
 
         class_id = (
-            int(label.item())
-            - 1
+            int(label.item()) - 1
         )
-
 
         if (
             class_id < 0
@@ -340,16 +364,17 @@ def predict_ssd(
 
             continue
 
-
         class_name = class_names[
             class_id
         ]
-
 
         confidence = float(
             score.item()
         )
 
+        # ----------------------------------------------------
+        # Draw bounding box
+        # ----------------------------------------------------
 
         cv2.rectangle(
             result_image,
@@ -359,38 +384,41 @@ def predict_ssd(
             2
         )
 
+        # ----------------------------------------------------
+        # Draw label
+        # ----------------------------------------------------
 
         text = (
             f"{class_name}: "
             f"{confidence:.2f}"
         )
 
-
         cv2.putText(
             result_image,
             text,
-            (x1, max(y1 - 10, 20)),
+            (
+                x1,
+                max(y1 - 10, 20)
+            ),
             cv2.FONT_HERSHEY_SIMPLEX,
             0.5,
             (0, 255, 0),
             2
         )
 
-
         detected_objects.append(
             text
         )
 
-
     # --------------------------------------------------------
-    # Output
+    # Return ORIGINAL SIZE image
+    # with bounding boxes
     # --------------------------------------------------------
 
     return (
         result_image,
         detected_objects
     )
-
 
 # ============================================================
 # 10. YOLO PREDICTION
