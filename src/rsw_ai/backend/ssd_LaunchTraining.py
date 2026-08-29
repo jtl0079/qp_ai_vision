@@ -57,7 +57,7 @@ def main():
     denoise = "gaussian",
     brightness=1.0,
     contrast=1.0,
-    normalize=True
+    normalize=False
   )
 
   train_dataset = SsdTorchDataset(ssd_data,transfrom,split="train")

@@ -45,7 +45,7 @@ def main():
         denoise = "gaussian",
         brightness=1.0,
         contrast=1.5,
-        normalize=True
+        normalize=False
     )
 
 
