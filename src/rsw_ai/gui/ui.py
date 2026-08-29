@@ -3,8 +3,14 @@ import torch
 import torchvision
 import numpy as np
 import gradio as gr
+import pickle
 
-import torchvision.transforms.functional as TF
+import rsw_ai.backend.ssdTransform as SsdTransform
+import rsw_ai.model.SsdTorchDataset as SsdTorchDataset
+
+from rsw_ai.model.ObjectDetectionEvaluator import (
+    ObjectDetectionEvaluator
+)
 
 
 # ============================================================
@@ -12,7 +18,8 @@ import torchvision.transforms.functional as TF
 # ============================================================
 
 device = torch.device(
-    "cuda" if torch.cuda.is_available()
+    "cuda"
+    if torch.cuda.is_available()
     else "cpu"
 )
 
@@ -34,32 +41,88 @@ class_names = [
 
 
 # ============================================================
-# 3. LOAD SSD
+# 3. EVALUATOR
+# ============================================================
+
+evaluator = ObjectDetectionEvaluator(
+    iou_threshold=0.5,
+    confidence_threshold=0.65
+)
+
+
+# ============================================================
+# 4. LOAD VALIDATION DATASET
+# ============================================================
+
+with open(
+    "/content/drive/MyDrive/"
+    "RSW_Y2S1_AI/dataset/ssd_data.pkl",
+    "rb"
+) as f:
+
+    ssd_dataset = pickle.load(f)
+
+
+valid_transform = SsdTransform(
+    resize=(300, 300),
+    horizontal_flip=False,
+    vertical_flip=False,
+    denoise="gaussian",
+    brightness=1.0,
+    contrast=1.5,
+    normalize=False
+)
+
+
+valid_dataset = SsdTorchDataset(
+    ssd_dataset=ssd_dataset,
+    transform=valid_transform,
+    split="valid"
+)
+
+
+print(
+    "Validation images:",
+    len(valid_dataset)
+)
+
+
+# ============================================================
+# 5. LOAD SSD MODEL
 # ============================================================
 
 ssd_model = torchvision.models.detection.ssd300_vgg16(
-    num_classes=7
+    num_classes=7,
+    score_thresh=0.0,
+    nms_thresh=0.3,
+    detections_per_img=100
 )
+
 
 ssd_model.load_state_dict(
     torch.load(
-        "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/ssd_model.pth",
+        "/content/drive/MyDrive/"
+        "RSW_Y2S1_AI/dataset/ssd_model/"
+        "ssd_best_model.pth",
         map_location=device,
         weights_only=True
     )
 )
 
+
 ssd_model.to(device)
 ssd_model.eval()
+
 
 print("SSD model loaded.")
 
 
 # ============================================================
-# 4. YOLO
+# 6. YOLO MODEL
 # ============================================================
 
 yolo_model = None
+
 
 # Example:
 #
@@ -71,10 +134,11 @@ yolo_model = None
 
 
 # ============================================================
-# 5. MASK R-CNN
+# 7. MASK R-CNN MODEL
 # ============================================================
 
 mask_rcnn_model = None
+
 
 # Example:
 #
@@ -85,28 +149,172 @@ mask_rcnn_model = None
 
 
 # ============================================================
-# 6. SSD PREDICTION
+# 8. SSD PREDICTION FUNCTION
 # ============================================================
 
-def predict_ssd(image, confidence_threshold):
+def ssd_prediction_function(
+    model,
+    image,
+    device
+):
 
-    image_tensor = TF.to_tensor(image)
+    image = image.to(device)
 
-    image_tensor = image_tensor.to(device)
 
     with torch.no_grad():
 
-        prediction = ssd_model(
-            [image_tensor]
+        prediction = model(
+            [image]
         )[0]
 
-    boxes = prediction["boxes"].cpu()
-    labels = prediction["labels"].cpu()
-    scores = prediction["scores"].cpu()
 
-    result_image = image.copy()
+    return {
+
+        "boxes":
+            prediction["boxes"].cpu(),
+
+        "labels":
+            prediction["labels"].cpu(),
+
+        "scores":
+            prediction["scores"].cpu()
+
+    }
+
+
+# ============================================================
+# 9. SSD GRADIO DETECTION
+# ============================================================
+
+def predict_ssd(
+    image,
+    confidence_threshold
+):
+
+    if image is None:
+
+        return (
+            None,
+            []
+        )
+
+
+    # --------------------------------------------------------
+    # Convert image to RGB
+    # --------------------------------------------------------
+
+    image_rgb = cv2.cvtColor(
+        image,
+        cv2.COLOR_BGR2RGB
+    )
+
+
+    # --------------------------------------------------------
+    # Resize
+    # --------------------------------------------------------
+
+    transformed = cv2.resize(
+        image_rgb,
+        (300, 300)
+    )
+
+
+    # --------------------------------------------------------
+    # Gaussian denoise
+    # --------------------------------------------------------
+
+    transformed = cv2.GaussianBlur(
+        transformed,
+        (5, 5),
+        0
+    )
+
+
+    # --------------------------------------------------------
+    # Contrast = 1.5
+    # --------------------------------------------------------
+
+    mean = np.mean(
+        transformed,
+        axis=(0, 1),
+        keepdims=True
+    )
+
+
+    transformed = np.clip(
+        (
+            transformed.astype(
+                np.float32
+            )
+            - mean
+        )
+        * 1.5
+        + mean,
+        0,
+        255
+    ).astype(
+        np.uint8
+    )
+
+
+    # --------------------------------------------------------
+    # Convert to tensor
+    # --------------------------------------------------------
+
+    tensor_image = (
+        torch.from_numpy(
+            transformed
+        )
+        .permute(2, 0, 1)
+        .float()
+        / 255.0
+    )
+
+
+    tensor_image = tensor_image.to(
+        device
+    )
+
+
+    # --------------------------------------------------------
+    # Prediction
+    # --------------------------------------------------------
+
+    prediction = ssd_prediction_function(
+        ssd_model,
+        tensor_image,
+        device
+    )
+
+
+    boxes = prediction["boxes"]
+    labels = prediction["labels"]
+    scores = prediction["scores"]
+
+
+    # --------------------------------------------------------
+    # Confidence filtering
+    # --------------------------------------------------------
+
+    keep = (
+        scores
+        >= confidence_threshold
+    )
+
+
+    boxes = boxes[keep]
+    labels = labels[keep]
+    scores = scores[keep]
+
+
+    # --------------------------------------------------------
+    # Draw predictions
+    # --------------------------------------------------------
+
+    result_image = transformed.copy()
 
     detected_objects = []
+
 
     for box, label, score in zip(
         boxes,
@@ -114,50 +322,69 @@ def predict_ssd(image, confidence_threshold):
         scores
     ):
 
-        score = score.item()
-
-        if score < confidence_threshold:
-            continue
-
-        class_id = label.item() - 1
-
-        if class_id < 0:
-            continue
-
-        if class_id >= len(class_names):
-            continue
-
-        class_name = class_names[class_id]
-
-        x_min, y_min, x_max, y_max = map(
-            int,
-            box.tolist()
+        x1, y1, x2, y2 = (
+            box.int().tolist()
         )
+
+
+        class_id = (
+            int(label.item())
+            - 1
+        )
+
+
+        if (
+            class_id < 0
+            or class_id >= len(class_names)
+        ):
+
+            continue
+
+
+        class_name = class_names[
+            class_id
+        ]
+
+
+        confidence = float(
+            score.item()
+        )
+
 
         cv2.rectangle(
             result_image,
-            (x_min, y_min),
-            (x_max, y_max),
+            (x1, y1),
+            (x2, y2),
             (0, 255, 0),
             2
         )
+
+
+        text = (
+            f"{class_name}: "
+            f"{confidence:.2f}"
+        )
+
 
         cv2.putText(
             result_image,
-            f"{class_name}: {score:.2f}",
-            (
-                x_min,
-                max(y_min - 10, 20)
-            ),
+            text,
+            (x1, max(y1 - 10, 20)),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.6,
+            0.5,
             (0, 255, 0),
             2
         )
 
+
         detected_objects.append(
-            f"{class_name}: {score:.2f}"
+            text
         )
+
+
+    # --------------------------------------------------------
+    # Output
+    # --------------------------------------------------------
 
     return (
         result_image,
@@ -166,7 +393,7 @@ def predict_ssd(image, confidence_threshold):
 
 
 # ============================================================
-# 7. YOLO PREDICTION
+# 10. YOLO PREDICTION
 # ============================================================
 
 def predict_yolo(
@@ -178,43 +405,25 @@ def predict_yolo(
 
         return (
             image,
-            ["YOLO model has not been loaded."]
+            [
+                "YOLO model has not been loaded."
+            ]
         )
 
-    # --------------------------------------------------------
-    # YOLO prediction
-    # --------------------------------------------------------
 
-    # Example:
-    #
-    # results = yolo_model(
-    #     image,
-    #     conf=confidence_threshold
-    # )
-    #
-    # result_image = results[0].plot()
-    #
-    # detected_objects = []
-    #
-    # for box in results[0].boxes:
-    #
-    #     class_id = int(box.cls[0])
-    #     confidence = float(box.conf[0])
-    #
-    #     class_name = class_names[class_id]
-    #
-    #     detected_objects.append(
-    #         f"{class_name}: {confidence:.2f}"
-    #     )
+    # Future YOLO implementation
+
 
     return (
         image,
-        ["YOLO prediction"]
+        [
+            "YOLO prediction"
+        ]
     )
 
 
 # ============================================================
-# 8. MASK R-CNN PREDICTION
+# 11. MASK R-CNN PREDICTION
 # ============================================================
 
 def predict_mask_rcnn(
@@ -226,23 +435,25 @@ def predict_mask_rcnn(
 
         return (
             image,
-            ["Mask R-CNN model has not been loaded."]
+            [
+                "Mask R-CNN model has not been loaded."
+            ]
         )
 
-    # --------------------------------------------------------
-    # Mask R-CNN prediction
-    # --------------------------------------------------------
 
-    # Future implementation
+    # Future Mask R-CNN implementation
+
 
     return (
         image,
-        ["Mask R-CNN prediction"]
+        [
+            "Mask R-CNN prediction"
+        ]
     )
 
 
 # ============================================================
-# 9. SINGLE MODEL
+# 12. SINGLE MODEL DETECTION
 # ============================================================
 
 def predict_single(
@@ -258,16 +469,20 @@ def predict_single(
             "Please upload an image."
         )
 
+
     # ========================================================
     # SSD
     # ========================================================
 
     if model_name == "SSD":
 
-        result_image, objects = predict_ssd(
-            image,
-            confidence_threshold
+        result_image, objects = (
+            predict_ssd(
+                image,
+                confidence_threshold
+            )
         )
+
 
     # ========================================================
     # YOLO
@@ -275,10 +490,13 @@ def predict_single(
 
     elif model_name == "YOLO":
 
-        result_image, objects = predict_yolo(
-            image,
-            confidence_threshold
+        result_image, objects = (
+            predict_yolo(
+                image,
+                confidence_threshold
+            )
         )
+
 
     # ========================================================
     # MASK R-CNN
@@ -286,10 +504,13 @@ def predict_single(
 
     elif model_name == "Mask R-CNN":
 
-        result_image, objects = predict_mask_rcnn(
-            image,
-            confidence_threshold
+        result_image, objects = (
+            predict_mask_rcnn(
+                image,
+                confidence_threshold
+            )
         )
+
 
     else:
 
@@ -298,17 +519,23 @@ def predict_single(
             "Unknown model."
         )
 
+
     # ========================================================
     # RESULT TEXT
     # ========================================================
 
     if len(objects) == 0:
 
-        result_text = "No objects detected."
+        result_text = (
+            "No objects detected."
+        )
 
     else:
 
-        result_text = "\n".join(objects)
+        result_text = "\n".join(
+            objects
+        )
+
 
     return (
         result_image,
@@ -317,228 +544,113 @@ def predict_single(
 
 
 # ============================================================
-# 10. EVALUATION FUNCTIONS
-# ============================================================
-
-def calculate_precision(
-    true_positive,
-    false_positive
-):
-
-    denominator = (
-        true_positive +
-        false_positive
-    )
-
-    if denominator == 0:
-        return 0.0
-
-    return true_positive / denominator
-
-
-def calculate_recall(
-    true_positive,
-    false_negative
-):
-
-    denominator = (
-        true_positive +
-        false_negative
-    )
-
-    if denominator == 0:
-        return 0.0
-
-    return true_positive / denominator
-
-
-def calculate_f1(
-    precision,
-    recall
-):
-
-    denominator = precision + recall
-
-    if denominator == 0:
-        return 0.0
-
-    return (
-        2 *
-        precision *
-        recall /
-        denominator
-    )
-
-
-# ============================================================
-# 11. IOU
-# ============================================================
-
-def calculate_iou(
-    box1,
-    box2
-):
-
-    x1 = max(
-        box1[0],
-        box2[0]
-    )
-
-    y1 = max(
-        box1[1],
-        box2[1]
-    )
-
-    x2 = min(
-        box1[2],
-        box2[2]
-    )
-
-    y2 = min(
-        box1[3],
-        box2[3]
-    )
-
-    intersection_width = max(
-        0,
-        x2 - x1
-    )
-
-    intersection_height = max(
-        0,
-        y2 - y1
-    )
-
-    intersection = (
-        intersection_width *
-        intersection_height
-    )
-
-    area1 = (
-        (box1[2] - box1[0]) *
-        (box1[3] - box1[1])
-    )
-
-    area2 = (
-        (box2[2] - box2[0]) *
-        (box2[3] - box2[1])
-    )
-
-    union = (
-        area1 +
-        area2 -
-        intersection
-    )
-
-    if union == 0:
-        return 0.0
-
-    return intersection / union
-
-
-# ============================================================
-# 12. MODEL EVALUATION PLACEHOLDER
+# 13. EVALUATE MODEL
 # ============================================================
 
 def evaluate_model(
     model_name
 ):
 
-    # --------------------------------------------------------
-    # IMPORTANT
-    # --------------------------------------------------------
-    #
-    # Real Precision / Recall / F1 / mAP require:
-    #
-    # 1. Validation images
-    # 2. Ground-truth bounding boxes
-    # 3. Ground-truth class labels
-    #
-    # They cannot be calculated correctly from only
-    # one uploaded image.
-    #
-    # --------------------------------------------------------
+    # ========================================================
+    # SSD
+    # ========================================================
 
     if model_name == "SSD":
 
-        # ----------------------------------------------------
-        # Placeholder
-        # ----------------------------------------------------
-        #
-        # Replace these values with results calculated
-        # from your validation dataset.
-        #
-        precision = 0.0
-        recall = 0.0
-        f1 = 0.0
-        map50 = 0.0
-        map5095 = 0.0
+        results = evaluator.evaluate(
+
+            model=ssd_model,
+
+            dataset=valid_dataset,
+
+            device=device,
+
+            prediction_function=(
+                ssd_prediction_function
+            )
+
+        )
+
+        return results
+
+
+    # ========================================================
+    # YOLO
+    # ========================================================
 
     elif model_name == "YOLO":
 
-        precision = 0.0
-        recall = 0.0
-        f1 = 0.0
-        map50 = 0.0
-        map5095 = 0.0
+        return {
+
+            "Precision": 0.0,
+
+            "Recall": 0.0,
+
+            "F1-score": 0.0,
+
+            "IoU": 0.0,
+
+            "mAP@0.5": 0.0,
+
+            "mAP@0.5:0.95": 0.0
+
+        }
+
+
+    # ========================================================
+    # MASK R-CNN
+    # ========================================================
 
     elif model_name == "Mask R-CNN":
 
-        precision = 0.0
-        recall = 0.0
-        f1 = 0.0
-        map50 = 0.0
-        map5095 = 0.0
+        return {
 
-    else:
+            "Precision": 0.0,
 
-        precision = 0.0
-        recall = 0.0
-        f1 = 0.0
-        map50 = 0.0
-        map5095 = 0.0
+            "Recall": 0.0,
 
-    return {
-        "Precision": precision,
-        "Recall": recall,
-        "F1-score": f1,
-        "mAP@0.5": map50,
-        "mAP@0.5:0.95": map5095
-    }
+            "F1-score": 0.0,
+
+            "IoU": 0.0,
+
+            "mAP@0.5": 0.0,
+
+            "mAP@0.5:0.95": 0.0
+
+        }
+
+
+    return {}
 
 
 # ============================================================
-# 13. COMPARE MODELS
+# 14. COMPARE MODELS
 # ============================================================
 
 def compare_models():
-
-    # ========================================================
-    # Get evaluation results
-    # ========================================================
 
     ssd = evaluate_model(
         "SSD"
     )
 
+
     yolo = evaluate_model(
         "YOLO"
     )
+
 
     mask_rcnn = evaluate_model(
         "Mask R-CNN"
     )
 
-    # ========================================================
-    # Comparison table
-    # ========================================================
 
     comparison = f"""
+
 MODEL PERFORMANCE COMPARISON
-=================================================================================================================================================================
+==============================================================
 
 Metric                  SSD          YOLO        Mask R-CNN
------------------------------------------------------------------------------------------------------------------------------------------------------------------
+--------------------------------------------------------------
 
 Precision               {ssd["Precision"]:.4f}       {yolo["Precision"]:.4f}       {mask_rcnn["Precision"]:.4f}
 
@@ -546,37 +658,46 @@ Recall                  {ssd["Recall"]:.4f}       {yolo["Recall"]:.4f}       {ma
 
 F1-score                {ssd["F1-score"]:.4f}       {yolo["F1-score"]:.4f}       {mask_rcnn["F1-score"]:.4f}
 
+IoU                     {ssd["IoU"]:.4f}       {yolo["IoU"]:.4f}       {mask_rcnn["IoU"]:.4f}
+
 mAP@0.5                 {ssd["mAP@0.5"]:.4f}       {yolo["mAP@0.5"]:.4f}       {mask_rcnn["mAP@0.5"]:.4f}
 
 mAP@0.5:0.95            {ssd["mAP@0.5:0.95"]:.4f}       {yolo["mAP@0.5:0.95"]:.4f}       {mask_rcnn["mAP@0.5:0.95"]:.4f}
 
 
-================================================================================================================================================================
+==============================================================
+
 INTERPRETATION
 
 Precision:
-Measures how many detected objects are actually correct.
+Of all predicted objects, how many are correct.
 
 Recall:
-Measures how many actual objects were successfully detected.
+Of all actual objects, how many are detected.
 
 F1-score:
-Balances Precision and Recall.
+Harmonic mean of Precision and Recall.
+
+IoU:
+Measures overlap between predicted bounding boxes
+and ground-truth bounding boxes.
 
 mAP@0.5:
-Measures object detection performance using IoU = 0.50.
+Mean Average Precision at IoU = 0.50.
 
 mAP@0.5:0.95:
-Measures detection performance across multiple IoU thresholds.
+Mean Average Precision from IoU 0.50 to 0.95.
 
 Higher values indicate better detection performance.
+
 """
+
 
     return comparison
 
 
 # ============================================================
-# 14. GRADIO UI
+# 15. GRADIO UI
 # ============================================================
 
 with gr.Blocks() as demo:
@@ -593,6 +714,7 @@ with gr.Blocks() as demo:
         """
     )
 
+
     # ========================================================
     # INPUT IMAGE
     # ========================================================
@@ -602,17 +724,25 @@ with gr.Blocks() as demo:
         label="Upload Image"
     )
 
+
     # ========================================================
     # CONFIDENCE
     # ========================================================
 
     confidence_slider = gr.Slider(
+
         minimum=0.1,
+
         maximum=1.0,
+
         value=0.65,
+
         step=0.05,
+
         label="Confidence Threshold"
+
     )
+
 
     # ========================================================
     # SINGLE MODEL
@@ -622,31 +752,41 @@ with gr.Blocks() as demo:
         "## Single Model Detection"
     )
 
+
     model_dropdown = gr.Dropdown(
+
         choices=[
             "SSD",
             "YOLO",
             "Mask R-CNN"
         ],
+
         value="SSD",
+
         label="Select Model"
+
     )
+
 
     detect_button = gr.Button(
         "Detect",
         variant="primary"
     )
 
+
     single_output_image = gr.Image(
         label="Prediction Result"
     )
+
 
     single_output_text = gr.Textbox(
         label="Detection Result",
         lines=10
     )
 
+
     detect_button.click(
+
         fn=predict_single,
 
         inputs=[
@@ -659,7 +799,9 @@ with gr.Blocks() as demo:
             single_output_image,
             single_output_text
         ]
+
     )
+
 
     # ========================================================
     # MODEL COMPARISON
@@ -669,24 +811,35 @@ with gr.Blocks() as demo:
         "## Model Performance Comparison"
     )
 
+
     gr.Markdown(
         """
-        The comparison uses Precision, Recall, F1-score,
-        mAP@0.5 and mAP@0.5:0.95.
+        The comparison uses Precision, Recall,
+        F1-score, IoU, mAP@0.5 and mAP@0.5:0.95.
         """
     )
 
+
     compare_button = gr.Button(
+
         "Compare Model Performance",
+
         variant="primary"
+
     )
+
 
     comparison_output = gr.Textbox(
+
         label="Performance Comparison",
+
         lines=25
+
     )
 
+
     compare_button.click(
+
         fn=compare_models,
 
         inputs=[],
@@ -694,11 +847,12 @@ with gr.Blocks() as demo:
         outputs=[
             comparison_output
         ]
+
     )
 
 
 # ============================================================
-# 15. LAUNCH
+# 16. LAUNCH
 # ============================================================
 
 demo.launch(
