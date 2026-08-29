@@ -12,25 +12,17 @@ class ObjectDetectionEvaluator:
     ):
 
         self.iou_threshold = iou_threshold
-
-        self.confidence_threshold = (
-            confidence_threshold
-        )
+        self.confidence_threshold = confidence_threshold
 
         if map_iou_thresholds is None:
 
-            self.map_iou_thresholds = np.arange(
-                0.50,
-                0.96,
-                0.05
-            )
+            self.map_iou_thresholds = np.arange(0.50,0.96,0.05)
 
         else:
 
-            self.map_iou_thresholds = (
+            self.map_iou_thresholds = np.array(
                 map_iou_thresholds
             )
-
 
     # =========================================================
     # IoU
@@ -111,11 +103,9 @@ class ObjectDetectionEvaluator:
 
             return 0.0
 
-        return (
-            intersection /
-            union
+        return float(
+            intersection / union
         )
-
 
     # =========================================================
     # Match predictions
@@ -135,6 +125,22 @@ class ObjectDetectionEvaluator:
         ground_truth_labels,
         iou_threshold
     ):
+
+        if len(prediction_boxes) == 0:
+
+            return (
+                0,
+                0,
+                len(ground_truth_boxes)
+            )
+
+        if len(ground_truth_boxes) == 0:
+
+            return (
+                0,
+                len(prediction_boxes),
+                0
+            )
 
         prediction_boxes = (
             prediction_boxes.cpu().numpy()
@@ -156,7 +162,6 @@ class ObjectDetectionEvaluator:
             ground_truth_labels.cpu().numpy()
         )
 
-
         # -----------------------------------------------------
         # Sort predictions by confidence
         # -----------------------------------------------------
@@ -173,15 +178,13 @@ class ObjectDetectionEvaluator:
             prediction_labels[order]
         )
 
-
         matched_ground_truth = set()
 
         true_positive = 0
         false_positive = 0
 
-
         # -----------------------------------------------------
-        # Match predictions
+        # Match
         # -----------------------------------------------------
 
         for pred_box, pred_label in zip(
@@ -191,7 +194,6 @@ class ObjectDetectionEvaluator:
 
             best_iou = 0.0
             best_gt_index = -1
-
 
             for gt_index, (
                 gt_box,
@@ -203,34 +205,21 @@ class ObjectDetectionEvaluator:
                 )
             ):
 
-                if gt_index in (
-                    matched_ground_truth
-                ):
-
+                if gt_index in matched_ground_truth:
                     continue
-
-
-                # Class must match
 
                 if pred_label != gt_label:
-
                     continue
-
 
                 iou = self.calculate_iou(
                     pred_box,
                     gt_box
                 )
 
-
                 if iou > best_iou:
 
                     best_iou = iou
-
-                    best_gt_index = (
-                        gt_index
-                    )
-
+                    best_gt_index = gt_index
 
             # -------------------------------------------------
             # TP
@@ -238,7 +227,8 @@ class ObjectDetectionEvaluator:
 
             if (
                 best_gt_index >= 0
-                and best_iou >= iou_threshold
+                and
+                best_iou >= iou_threshold
             ):
 
                 true_positive += 1
@@ -247,7 +237,6 @@ class ObjectDetectionEvaluator:
                     best_gt_index
                 )
 
-
             # -------------------------------------------------
             # FP
             # -------------------------------------------------
@@ -255,7 +244,6 @@ class ObjectDetectionEvaluator:
             else:
 
                 false_positive += 1
-
 
         # -----------------------------------------------------
         # FN
@@ -267,13 +255,11 @@ class ObjectDetectionEvaluator:
             len(matched_ground_truth)
         )
 
-
         return (
             true_positive,
             false_positive,
             false_negative
         )
-
 
     # =========================================================
     # Precision
@@ -299,7 +285,6 @@ class ObjectDetectionEvaluator:
             denominator
         )
 
-
     # =========================================================
     # Recall
     # =========================================================
@@ -324,9 +309,8 @@ class ObjectDetectionEvaluator:
             denominator
         )
 
-
     # =========================================================
-    # F1-score
+    # F1
     # =========================================================
 
     def calculate_f1(
@@ -351,43 +335,59 @@ class ObjectDetectionEvaluator:
             denominator
         )
 
-
     # =========================================================
     # Calculate AP for ONE CLASS
+    #
+    # Standard detection AP calculation
     # =========================================================
 
     def calculate_ap(
         self,
-        prediction_data,
-        ground_truth_count,
+        predictions,
+        ground_truths,
         class_id,
         iou_threshold
     ):
 
-        if ground_truth_count == 0:
+        # -----------------------------------------------------
+        # Ground truth count for this class
+        # -----------------------------------------------------
+
+        total_ground_truth = 0
+
+        for image_id in ground_truths:
+
+            for gt in ground_truths[image_id]:
+
+                if gt["label"] == class_id:
+
+                    total_ground_truth += 1
+
+        if total_ground_truth == 0:
 
             return 0.0
 
-
         # -----------------------------------------------------
-        # Keep only predictions of this class
+        # Get predictions of this class
         # -----------------------------------------------------
 
         class_predictions = [
 
             prediction
 
-            for prediction in prediction_data
+            for prediction in predictions
 
             if prediction["label"] == class_id
 
         ]
 
+        # -----------------------------------------------------
+        # No predictions
+        # -----------------------------------------------------
 
         if len(class_predictions) == 0:
 
             return 0.0
-
 
         # -----------------------------------------------------
         # Sort by confidence
@@ -403,97 +403,84 @@ class ObjectDetectionEvaluator:
 
         )
 
+        true_positive = np.zeros(
+            len(class_predictions)
+        )
 
-        matched_ground_truth = set()
+        false_positive = np.zeros(
+            len(class_predictions)
+        )
 
-        true_positive = []
-        false_positive = []
+        # -----------------------------------------------------
+        # Track matched GT
+        #
+        # Each image has its own GT
+        # -----------------------------------------------------
 
+        matched_ground_truth = {}
+
+        for image_id in ground_truths:
+
+            matched_ground_truth[image_id] = set()
 
         # -----------------------------------------------------
         # Match predictions
         # -----------------------------------------------------
 
-        for prediction in class_predictions:
+        for prediction_index, prediction in enumerate(
+            class_predictions
+        ):
 
-            image_id = (
-                prediction["image_id"]
-            )
+            image_id = prediction["image_id"]
 
-            pred_box = (
-                prediction["box"]
-            )
-
-            ground_truths = (
-                prediction["ground_truths"]
-            )
-
+            pred_box = prediction["box"]
 
             best_iou = 0.0
-            best_index = -1
 
+            best_gt_index = -1
 
-            for index, gt in enumerate(
-                ground_truths
+            image_ground_truths = ground_truths.get(
+                image_id,
+                []
+            )
+
+            for gt_index, gt in enumerate(
+                image_ground_truths
             ):
 
-                key = (
-                    image_id,
-                    index
-                )
-
-
-                if key in (
-                    matched_ground_truth
-                ):
-
+                if gt_index in matched_ground_truth[image_id]:
                     continue
 
-
-                # Only same class
-
-                if (
-                    gt["label"]
-                    !=
-                    class_id
-                ):
-
+                if gt["label"] != class_id:
                     continue
-
 
                 iou = self.calculate_iou(
                     pred_box,
                     gt["box"]
                 )
 
-
                 if iou > best_iou:
 
                     best_iou = iou
-
-                    best_index = index
-
+                    best_gt_index = gt_index
 
             # -------------------------------------------------
             # TP
             # -------------------------------------------------
 
             if (
-                best_index >= 0
-                and best_iou >= iou_threshold
+                best_gt_index >= 0
+                and
+                best_iou >= iou_threshold
             ):
 
-                true_positive.append(1)
+                true_positive[prediction_index] = 1
 
-                false_positive.append(0)
-
-                matched_ground_truth.add(
-                    (
-                        image_id,
-                        best_index
-                    )
+                matched_ground_truth[
+                    image_id
+                ].add(
+                    best_gt_index
                 )
-
 
             # -------------------------------------------------
             # FP
@@ -501,22 +488,10 @@ class ObjectDetectionEvaluator:
 
             else:
 
-                true_positive.append(0)
-
-                false_positive.append(1)
-
-
-        true_positive = np.array(
-            true_positive
-        )
-
-        false_positive = np.array(
-            false_positive
-        )
-
+                false_positive[prediction_index] = 1
 
         # -----------------------------------------------------
-        # Cumulative TP / FP
+        # Cumulative values
         # -----------------------------------------------------
 
         cumulative_tp = np.cumsum(
@@ -527,24 +502,22 @@ class ObjectDetectionEvaluator:
             false_positive
         )
 
-
         precision = (
             cumulative_tp /
-            (
+            np.maximum(
                 cumulative_tp +
-                cumulative_fp
+                cumulative_fp,
+                1e-12
             )
         )
 
-
         recall = (
             cumulative_tp /
-            ground_truth_count
+            total_ground_truth
         )
 
-
         # -----------------------------------------------------
-        # Add boundary points
+        # Precision envelope
         # -----------------------------------------------------
 
         precision = np.concatenate(
@@ -563,11 +536,6 @@ class ObjectDetectionEvaluator:
             )
         )
 
-
-        # -----------------------------------------------------
-        # Precision envelope
-        # -----------------------------------------------------
-
         for index in range(
             len(precision) - 2,
             -1,
@@ -579,17 +547,13 @@ class ObjectDetectionEvaluator:
                 precision[index + 1]
             )
 
-
         # -----------------------------------------------------
-        # Calculate area under PR curve
+        # Calculate AP
         # -----------------------------------------------------
 
         indices = np.where(
-            recall[1:]
-            !=
-            recall[:-1]
+            recall[1:] != recall[:-1]
         )[0]
-
 
         ap = np.sum(
             (
@@ -601,9 +565,7 @@ class ObjectDetectionEvaluator:
             precision[indices + 1]
         )
 
-
         return float(ap)
-
 
     # =========================================================
     # Evaluate one model
@@ -619,38 +581,40 @@ class ObjectDetectionEvaluator:
 
         model.eval()
 
-
         # =====================================================
-        # Metrics for Precision / Recall / F1
+        # Precision / Recall / F1
         # =====================================================
 
         total_true_positive = 0
-
         total_false_positive = 0
-
         total_false_negative = 0
 
-
         # =====================================================
-        # Store ALL predictions for mAP
+        # Store ALL predictions
+        #
+        # Important:
+        # NO confidence filtering for mAP
         # =====================================================
 
         all_predictions = []
 
+        # =====================================================
+        # Ground truths by image
+        # =====================================================
+
+        ground_truths = {}
 
         # =====================================================
-        # Ground truth count per class
+        # Ground truth classes
         # =====================================================
 
         ground_truth_per_class = {}
-
 
         # =====================================================
         # Matched IoU
         # =====================================================
 
         matched_ious = []
-
 
         # =====================================================
         # Loop validation dataset
@@ -664,7 +628,6 @@ class ObjectDetectionEvaluator:
                 image_index
             ]
 
-
             ground_truth_boxes = (
                 target["boxes"]
             )
@@ -673,15 +636,31 @@ class ObjectDetectionEvaluator:
                 target["labels"]
             )
 
+            # -------------------------------------------------
+            # Store GT
+            # -------------------------------------------------
 
-            # =================================================
-            # Count GT per class
-            # =================================================
+            ground_truths[image_index] = []
 
-            for gt_label in ground_truth_labels:
+            for gt_box, gt_label in zip(
+                ground_truth_boxes,
+                ground_truth_labels
+            ):
 
                 class_id = int(
                     gt_label.item()
+                )
+
+                ground_truths[
+                    image_index
+                ].append(
+                    {
+                        "box":
+                            gt_box.cpu().numpy(),
+
+                        "label":
+                            class_id
+                    }
                 )
 
                 ground_truth_per_class[
@@ -695,10 +674,9 @@ class ObjectDetectionEvaluator:
                     1
                 )
 
-
-            # =================================================
+            # -------------------------------------------------
             # Prediction
-            # =================================================
+            # -------------------------------------------------
 
             with torch.no_grad():
 
@@ -709,7 +687,6 @@ class ObjectDetectionEvaluator:
                         device
                     )
                 )
-
 
             prediction_boxes = (
                 prediction["boxes"]
@@ -723,34 +700,9 @@ class ObjectDetectionEvaluator:
                 prediction["scores"]
             )
 
-
             # =================================================
-            # Store ALL predictions for mAP
-            #
-            # IMPORTANT:
-            # No confidence filtering here
+            # STORE ALL PREDICTIONS FOR mAP
             # =================================================
-
-            gt_list = []
-
-
-            for gt_box, gt_label in zip(
-                ground_truth_boxes,
-                ground_truth_labels
-            ):
-
-                gt_list.append(
-                    {
-                        "box":
-                            gt_box.cpu().numpy(),
-
-                        "label":
-                            int(
-                                gt_label.item()
-                            )
-                    }
-                )
-
 
             for box, label, score in zip(
                 prediction_boxes,
@@ -774,18 +726,14 @@ class ObjectDetectionEvaluator:
                         "score":
                             float(
                                 score.item()
-                            ),
-
-                        "ground_truths":
-                            gt_list
+                            )
                     }
                 )
-
 
             # =================================================
             # Confidence filtering
             #
-            # Used ONLY for:
+            # ONLY for:
             # Precision
             # Recall
             # F1
@@ -798,7 +746,6 @@ class ObjectDetectionEvaluator:
                 self.confidence_threshold
             )
 
-
             filtered_boxes = (
                 prediction_boxes[keep]
             )
@@ -810,7 +757,6 @@ class ObjectDetectionEvaluator:
             filtered_scores = (
                 prediction_scores[keep]
             )
-
 
             # =================================================
             # Precision / Recall / F1
@@ -836,7 +782,6 @@ class ObjectDetectionEvaluator:
 
             )
 
-
             total_true_positive += (
                 true_positive
             )
@@ -849,15 +794,11 @@ class ObjectDetectionEvaluator:
                 false_negative
             )
 
-
             # =================================================
             # IoU
             # =================================================
 
             used_ground_truth = set()
-
-
-            # Sort filtered predictions by confidence
 
             if len(filtered_scores) > 0:
 
@@ -866,87 +807,71 @@ class ObjectDetectionEvaluator:
                     descending=True
                 )
 
-            else:
+                for prediction_index in order:
 
-                order = []
-
-
-            for prediction_index in order:
-
-                pred_box = (
-                    filtered_boxes[
-                        prediction_index
-                    ]
-                )
-
-                pred_label = int(
-                    filtered_labels[
-                        prediction_index
-                    ].item()
-                )
-
-
-                best_iou = 0.0
-                best_gt_index = -1
-
-
-                for gt_index, (
-                    gt_box,
-                    gt_label
-                ) in enumerate(
-                    zip(
-                        ground_truth_boxes,
-                        ground_truth_labels
-                    )
-                ):
-
-                    if gt_index in (
-                        used_ground_truth
-                    ):
-
-                        continue
-
-
-                    if (
-                        pred_label
-                        !=
-                        int(gt_label.item())
-                    ):
-
-                        continue
-
-
-                    iou = self.calculate_iou(
-
-                        pred_box.cpu().numpy(),
-
-                        gt_box.cpu().numpy()
-
+                    pred_box = (
+                        filtered_boxes[
+                            prediction_index
+                        ]
                     )
 
+                    pred_label = int(
+                        filtered_labels[
+                            prediction_index
+                        ].item()
+                    )
 
-                    if iou > best_iou:
+                    best_iou = 0.0
+                    best_gt_index = -1
 
-                        best_iou = iou
+                    for gt_index, (
+                        gt_box,
+                        gt_label
+                    ) in enumerate(
+                        zip(
+                            ground_truth_boxes,
+                            ground_truth_labels
+                        )
+                    ):
 
-                        best_gt_index = (
-                            gt_index
+                        if gt_index in used_ground_truth:
+                            continue
+
+                        if (
+                            pred_label
+                            !=
+                            int(
+                                gt_label.item()
+                            )
+                        ):
+                            continue
+
+                        iou = self.calculate_iou(
+
+                            pred_box.cpu().numpy(),
+
+                            gt_box.cpu().numpy()
+
                         )
 
+                        if iou > best_iou:
 
-                if (
-                    best_gt_index >= 0
-                    and best_iou >= self.iou_threshold
-                ):
+                            best_iou = iou
+                            best_gt_index = gt_index
 
-                    matched_ious.append(
-                        best_iou
-                    )
+                    if (
+                        best_gt_index >= 0
+                        and
+                        best_iou >= self.iou_threshold
+                    ):
 
-                    used_ground_truth.add(
-                        best_gt_index
-                    )
+                        matched_ious.append(
+                            best_iou
+                        )
 
+                        used_ground_truth.add(
+                            best_gt_index
+                        )
 
         # =====================================================
         # Precision
@@ -959,7 +884,6 @@ class ObjectDetectionEvaluator:
             )
         )
 
-
         # =====================================================
         # Recall
         # =====================================================
@@ -971,9 +895,8 @@ class ObjectDetectionEvaluator:
             )
         )
 
-
         # =====================================================
-        # F1-score
+        # F1
         # =====================================================
 
         f1 = (
@@ -982,7 +905,6 @@ class ObjectDetectionEvaluator:
                 recall
             )
         )
-
 
         # =====================================================
         # Mean IoU
@@ -1000,15 +922,11 @@ class ObjectDetectionEvaluator:
 
             mean_iou = 0.0
 
-
         # =====================================================
-        # mAP calculation
+        # Classes
         # =====================================================
 
-        class_ids = sorted(
-            ground_truth_per_class.keys()
-        )
-
+        class_ids = range(1, 7)
 
         # =====================================================
         # mAP@0.5
@@ -1016,21 +934,13 @@ class ObjectDetectionEvaluator:
 
         ap50_values = []
 
-
         for class_id in class_ids:
-
-            ground_truth_count = (
-                ground_truth_per_class[
-                    class_id
-                ]
-            )
-
 
             ap50 = self.calculate_ap(
 
                 all_predictions,
 
-                ground_truth_count,
+                ground_truths,
 
                 class_id,
 
@@ -1038,11 +948,9 @@ class ObjectDetectionEvaluator:
 
             )
 
-
             ap50_values.append(
                 ap50
             )
-
 
         if len(ap50_values) > 0:
 
@@ -1056,53 +964,48 @@ class ObjectDetectionEvaluator:
 
             map50 = 0.0
 
-
         # =====================================================
         # mAP@0.5:0.95
+        #
+        # IoU:
+        # 0.50
+        # 0.55
+        # 0.60
+        # ...
+        # 0.95
         # =====================================================
 
         map_values = []
-
 
         for iou_threshold in (
             self.map_iou_thresholds
         ):
 
-            class_ap_values = []
-
+            ap_values = []
 
             for class_id in class_ids:
-
-                ground_truth_count = (
-                    ground_truth_per_class[
-                        class_id
-                    ]
-                )
-
 
                 ap = self.calculate_ap(
 
                     all_predictions,
 
-                    ground_truth_count,
+                    ground_truths,
 
                     class_id,
 
-                    iou_threshold
+                    float(iou_threshold)
 
                 )
 
-
-                class_ap_values.append(
+                ap_values.append(
                     ap
                 )
 
-
-            if len(class_ap_values) > 0:
+            if len(ap_values) > 0:
 
                 map_at_threshold = float(
                     np.mean(
-                        class_ap_values
+                        ap_values
                     )
                 )
 
@@ -1110,11 +1013,9 @@ class ObjectDetectionEvaluator:
 
                 map_at_threshold = 0.0
 
-
             map_values.append(
                 map_at_threshold
             )
-
 
         if len(map_values) > 0:
 
@@ -1127,7 +1028,6 @@ class ObjectDetectionEvaluator:
         else:
 
             map5095 = 0.0
-
 
         # =====================================================
         # Result
