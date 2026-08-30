@@ -27,6 +27,7 @@ dependencies = [
     "requests",
     "kaggle",
     "ultralytics>=8.3",
+    "gradio",
 ]
 
 [project.optional-dependencies]

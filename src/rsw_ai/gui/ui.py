@@ -40,7 +40,7 @@ class_names = [
 ssd_model = torchvision.models.detection.ssd300_vgg16(
     num_classes=7
 )
-
+"\outputs\models\ssd\ssd_model.pth"
 ssd_model.load_state_dict(
     torch.load(
         "/content/drive/MyDrive/RSW_Y2S1_AI/dataset/ssd_model.pth",
